@@ -1,14 +1,1 @@
-[
-{
-"ID": 0,
-"Status": "文件下载成功,文件大小为14244字节,下载耗时0s，文件来源URL：https://picsum.photos/seed/guoxue1/400/300.jpg",
-"URL": "https://picsum.photos/seed/guoxue1/400/300.jpg",
-"Filename": "test1"
-},
-{
-"ID": 1,
-"Status": "重试失败",
-"URL": "xxx",
-"Filename": "test2"
-}
-]
+null
