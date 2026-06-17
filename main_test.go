@@ -9,6 +9,12 @@ import (
 	"testing"
 )
 
+// 构造一些测试URL和请求参数用于测试下载处理函数的功能和边界情况，以下为预期结果
+// 前6个URL应该成功下载，生成对应的文件，日志中应该有下载成功的记录
+// 第7个URL应该因为下载队列已满而加入等待队列，日志中应该有加入等待队列的记录
+// 第8个URL应该因为URL格式错误而下载失败，日志中应该有下载失败的记录，并且重试次数记录中应该有对应的记录
+// 第9~11个URL是用来装满下载队列的，应该都加入等待队列，日志中应该有加入等待队列的记录
+// 第12个URL应该因为等待队列已满而直接返回错误提示，日志中应该有下载请求过多的记录
 var TestURL []string = []string{
 	"https://picsum.photos/seed/guoxue1/400/300.jpg&filename=testphoto1.jpg",
 	"https://picsum.photos/seed/zhonghua2/400/300.jpg&filename=testphoto2.jpg",
@@ -24,6 +30,11 @@ var TestURL []string = []string{
 	"https://picsum.photos/seed/guoxue1/400/300.jpg&filename=testphoto1.jpg",
 }
 
+// 构造一些测试请求用于测试重试处理函数的功能和边界情况，以下为预期结果
+// 第1个请求应该成功下载，日志中应该有下载成功的记录
+// 第2个请求应该因为用户放弃重试而返回错误提示，日志中应该有用户放弃下载的记录，并且重试次数记录中应该有对应的记录
+// 第3个请求应该因为重试信息无效而返回错误提示，日志中应该有无效的重试信息的记录，并且重试次数记录中不应该有对应的记录
+// 第4个请求应该因为URL格式错误而下载失败，日志中应该有下载失败的记录，并且重试次数记录中应该有对应的记录
 var TestReq []Req = []Req{
 	{"https://picsum.photos/seed/guoxue1/400/300.jpg,testphoto1.jpg", "yes"},
 	{"https://picsum.photos/seed/guoxue1/400/300.jpg,testphoto1.jpg", "no"},
@@ -37,19 +48,19 @@ type Req struct {
 }
 
 func TestDownloadFileHandler(t *testing.T) {
-	ch = make(chan string)
-	bucket = make(chan interface{}, 5)
-	retrych = make(chan string)
-	waitdownloadCh = make(chan Request, 10)
-	go func() { // 消化日志通道中的日志，避免阻塞导致测试流程卡死
+	ch = make(chan string)                  // 初始化日志通道
+	bucket = make(chan interface{}, 5)      // 初始化下载队列，容量为5
+	retrych = make(chan string)             // 初始化重试请求通道
+	waitdownloadCh = make(chan Request, 10) // 初始化等待下载队列，容量为10
+	go func() {                             // 消化日志通道中的日志，避免阻塞导致测试流程卡死
 		for msg := range ch {
 			log.Printf("日志: %s", msg)
 		}
 		defer close(ch)
 	}()
 	for idx, url := range TestURL {
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "/download?url="+url, nil)
+		resp := httptest.NewRecorder()                               // 创建一个响应记录器
+		req := httptest.NewRequest("GET", "/download?url="+url, nil) // 创建一个模拟的HTTP请求，URL参数为测试URL
 		if idx == 5 {
 			for i := 0; i < 5; i++ {
 				bucket <- struct{}{} // 模拟下载队列已满
